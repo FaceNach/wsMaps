@@ -1,115 +1,107 @@
+import { safeParseAsync } from "zod/mini";
 import {
   messageSchema,
+  type ClientRegisterPayload,
   type MessageParsed,
-} from '../schemas/websocket-message.schema';
-import { myService } from '../services/my-service.service';
-import type { WebSocketMessage, WebSocketResponse } from '../types';
+} from "../schemas/websocket-message.schema";
+import type { OutgoingWsMessage } from "../types";
 
-const createErrorResponse = (error: string): WebSocketResponse => {
+interface HandlerResult {
+  personal: OutgoingWsMessage[];
+  broadcast: OutgoingWsMessage[];
+}
+
+const createErrorResponse = (error: string): OutgoingWsMessage => {
   return {
-    type: 'ERROR',
+    type: "ERROR",
     payload: { error: error },
   };
 };
 
-//! Handlers específicos
-const handleAddItem = (
-  payload: MessageParsed['payload']
-): WebSocketResponse => {
-  if (!payload?.name) {
-    return createErrorResponse('Name is required');
-  }
-
-  const newItem = myService.add(payload.name);
-
+export const handleGetClients = (): HandlerResult => {
   return {
-    type: 'ITEM_ADDED',
-    payload: newItem,
+    personal: [
+      {
+        type: "CLIENT_STATE",
+        payload: [],
+      },
+    ],
+    broadcast: [],
   };
 };
 
-export const handleGetItems = (): WebSocketResponse => {
+export const handleClientRegister = (
+  clientId: string,
+  payload: ClientRegisterPayload,
+): HandlerResult => {
   return {
-    type: 'ITEMS_LIST',
-    payload: myService.getAll(),
+    personal: [],
+    broadcast: [
+      {
+        type: "CLIENT_JOIN",
+        payload: {
+          clientId: clientId,
+          color: payload.color || 'gray',
+          coords: payload.coords,
+          name: payload.name,
+          updatedAt: 12124,
+        },
+      },
+    ],
   };
 };
 
-const handleUpdateItem = (
-  payload: MessageParsed['payload']
-): WebSocketResponse => {
-  if (!payload?.id) {
-    return createErrorResponse('Item ID is required');
-  }
-
-  const updatedItem = myService.update(payload.id, {
-    name: payload.name,
-  });
-
-  if (!updatedItem) {
-    return createErrorResponse(`Item with id ${payload.id} not found`);
-  }
-
+export const handleClientMove = (clientId, payload): HandlerResult => {
   return {
-    type: 'ITEM_UPDATED',
-    payload: updatedItem,
-  };
-};
-
-const handleDeleteItem = (
-  payload: MessageParsed['payload']
-): WebSocketResponse => {
-  if (!payload?.id) {
-    return createErrorResponse(`Item with id ${payload?.id} not found`);
-  }
-
-  const deleted = myService.delete(payload.id);
-
-  if (!deleted) {
-    return createErrorResponse(
-      `Item with id ${payload.id} not found or can't be deleted`
-    );
-  }
-
-  return {
-    type: 'ITEM_DELETED',
-    payload: {
-      id: payload.id,
-    },
+    personal: [],
+    broadcast: [],
   };
 };
 
 //! General Handler o controlador general
-export const handleMessage = (message: string): WebSocketResponse => {
+export const handleMessage = (
+  clientId: string,
+  rawMessage: string,
+): HandlerResult => {
   try {
-    const jsonData: WebSocketMessage = JSON.parse(message);
+    const jsonData: unknown = JSON.parse(rawMessage);
     const parsedResult = messageSchema.safeParse(jsonData);
 
     if (!parsedResult.success) {
       console.log(parsedResult.error);
       const errorMessage = parsedResult.error.issues
         .map((issue) => issue.message)
-        .join(', ');
+        .join(", ");
 
-      return createErrorResponse(`Validation error ${errorMessage}`);
+      return {
+        personal: [createErrorResponse(`Validation error: ${errorMessage}`)],
+        broadcast: [],
+      };
     }
 
     const { type, payload } = parsedResult.data;
 
     switch (type) {
-      case 'ADD_ITEM':
-        return handleAddItem(payload);
+      case "GET_CLIENTS":
+        return handleGetClients();
 
-      case 'UPDATE_ITEM':
-        return handleUpdateItem(payload);
+      case "CLIENT_REGISTER":
+        return handleClientRegister(clientId, payload);
 
-      case 'DELETE_ITEM':
-        return handleDeleteItem(payload);
+      case "CLIENT_MOVE":
+        return handleClientMove(clientId, payload);
 
       default:
-        return createErrorResponse(`Unknown message type: ${type}`);
+        return {
+          personal: [createErrorResponse(`Unknown message type ${type}`)],
+          broadcast: [],
+        };
     }
   } catch (error) {
-    return createErrorResponse(`Validation error`);
+    console.log({ error });
+    return {
+      personal: [createErrorResponse(`Unknown error found: ${error}`)],
+      broadcast: [],
+    };
   }
 };
