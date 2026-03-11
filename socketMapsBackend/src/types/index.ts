@@ -37,6 +37,10 @@ export type IncomingWsMessage =
   | {
       type: "GET_CLIENTS";
       payload?: any; //TODO: future could expand it
+    }
+  | {
+      type: "CLIENT_LEFT";
+      payload: any;
     };
 
 export type OutgoingWsMessage =
