@@ -85,7 +85,7 @@ export const handleClientMove = (
       {
         type: "CLIENT_MOVE",
         payload: {
-          clientID: clientMove.clientId,
+          clientId: clientMove.clientId,
           coords: clientMove.coords,
           updatedAt: clientMove.updatedAt,
         },

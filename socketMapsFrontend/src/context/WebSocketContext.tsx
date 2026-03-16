@@ -39,11 +39,11 @@ export type SocketResponse =
       payload: Client;
     }
   | {
-      type: "CLIENTS_STATE";
+      type: "CLIENT_STATE";
       payload: Client[];
     }
   | {
-      type: "CLIENT_JOINED";
+      type: "CLIENT_JOIN";
       payload: Client;
     }
   | {
@@ -71,6 +71,7 @@ interface WebSocketContextState {
 export const WebSocketContext = createContext({} as WebSocketContextState);
 
 const messageListenersRef = new Set<SocketMessageListener>();
+let connecting = false;
 
 interface Props {
   children: ReactNode;
@@ -93,10 +94,14 @@ export const WebSocketProvider = ({ children, url }: Props) => {
   };
 
   const connect = useCallback(() => {
+    if (connecting) return;
+    connecting = true;
+    setStatus("connecting");
     const ws = new WebSocket(url);
     shouldReconnectRef.current = true;
 
     ws.addEventListener("open", () => {
+      connecting = false;
       socket.current = ws;
       setStatus("connected");
     });
@@ -127,12 +132,12 @@ export const WebSocketProvider = ({ children, url }: Props) => {
   }, [url]);
 
   const connectToServer = (name: string, color: string, latLng: LatLng) => {
+    if (status === "connecting" || status === "connected") return;
+
     Cookies.set("name", name);
     Cookies.set("color", color);
     Cookies.set("coords", JSON.stringify(latLng));
     connect();
-
-    console.log({ name, color, latLng });
   };
 
   const subscribeToMessages = (listener: SocketMessageListener) => {
@@ -171,9 +176,7 @@ export const WebSocketProvider = ({ children, url }: Props) => {
   }, [status, connect]);
 
   const send = (message: SocketMessage) => {
-    if (!socket) throw new Error("Socket not connected");
-    if (status !== "connected")
-      throw new Error("Socket not connected (status)");
+    if (!socket.current) throw new Error("Socket not connected");
 
     const jsonMessage = JSON.stringify(message);
     socket.current?.send(jsonMessage);

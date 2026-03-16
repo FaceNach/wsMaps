@@ -65,7 +65,7 @@ export type OutgoingWsMessage =
   | {
       type: "CLIENT_MOVE";
       payload: {
-        clientID: string;
+        clientId: string;
         coords: LatLng;
         updatedAt: number;
       };

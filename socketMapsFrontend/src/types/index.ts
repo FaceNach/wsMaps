@@ -8,4 +8,5 @@ export interface Client {
   name: string;
   color: string;
   coords: LatLng;
+  updatedAt?: number;
 }
